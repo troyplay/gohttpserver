@@ -40,6 +40,7 @@ type HTTPStaticServer struct {
 	Root            string
 	Upload          bool
 	Delete          bool
+	MKDir           bool
 	Title           string
 	Theme           string
 	PlistProxy      string
@@ -88,10 +89,13 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 
 	// TODO: /ipa/info
 	m.HandleFunc("/-/info/{path:.*}", s.hInfo)
-
+	// routers for listing (directory or files) / uploading / deleting files
 	m.HandleFunc("/{path:.*}", s.hIndex).Methods("GET", "HEAD")
 	m.HandleFunc("/{path:.*}", s.hUpload).Methods("POST")
 	m.HandleFunc("/{path:.*}", s.hDelete).Methods("DELETE")
+	// routers for directory
+	m.HandleFunc("/-/mkdir/{path:.*}", s.hMkdir).Methods("POST")
+
 	return s
 }
 
@@ -120,6 +124,32 @@ func (s *HTTPStaticServer) hStatus(w http.ResponseWriter, r *http.Request) {
 	data, _ := json.MarshalIndent(s, "", "    ")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
+}
+
+// create function to HTTPStaticServer for making directory
+func (s *HTTPStaticServer) hMkdir(w http.ResponseWriter, req *http.Request) {
+	// only can delete file now
+	path := mux.Vars(req)["path"]
+	auth := s.readAccessConf(path)
+	log.Printf("%#v", auth)
+	if !auth.canMKDir(req) {
+		http.Error(w, "Mkdir forbidden", http.StatusForbidden)
+		return
+	}
+	folder := filepath.Join(s.Root, path)
+	err := os.Mkdir(folder, 0731) // wxr-xr-x
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	//TODO create default auth file
+	cfgFile := filepath.Join(folder, ".ghs.yml")
+	file, createErr := os.Create(cfgFile)
+	if createErr != nil {
+		log.Printf("%#v", createErr)
+	}
+	file.WriteString("upload: true\ndelete: true\nmkdir: false")
+	w.Write([]byte("Success"))
 }
 
 func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
@@ -377,13 +407,15 @@ type AccessTable struct {
 type UserControl struct {
 	Email string
 	// Access bool
-	Upload bool
-	Delete bool
+	Upload bool // upload file
+	Delete bool // delete file
+	MKDir  bool // create dir
 }
 
 type AccessConf struct {
 	Upload       bool          `yaml:"upload" json:"upload"`
 	Delete       bool          `yaml:"delete" json:"delete"`
+	MKDir        bool          `yaml:"mkdir" json:"mkdir"`
 	Users        []UserControl `yaml:"users" json:"users"`
 	AccessTables []AccessTable `yaml:"accessTables"`
 }
@@ -444,6 +476,25 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 	return c.Upload
 }
 
+/* function can mkdir */
+func (c *AccessConf) canMKDir(r *http.Request) bool {
+	session, err := store.Get(r, defaultSessionName)
+	if err != nil {
+		return c.MKDir
+	}
+	val := session.Values["user"]
+	if val == nil {
+		return c.MKDir
+	}
+	userInfo := val.(*UserInfo)
+	for _, rule := range c.Users {
+		if rule.Email == userInfo.Email {
+			return rule.MKDir
+		}
+	}
+	return c.MKDir
+}
+
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
 	localPath := filepath.Join(s.Root, requestPath)
@@ -451,6 +502,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	auth := s.readAccessConf(requestPath)
 	auth.Upload = auth.canUpload(r)
 	auth.Delete = auth.canDelete(r)
+	auth.MKDir = auth.canMKDir(r)
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
@@ -583,6 +635,7 @@ func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
 	return AccessConf{
 		Upload: s.Upload,
 		Delete: s.Delete,
+		MKDir:  s.MKDir,
 	}
 }
 

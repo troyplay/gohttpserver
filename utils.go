@@ -49,7 +49,7 @@ func SublimeContains(s, substr string) bool {
 			ok = false
 			break
 		}
-		j += 1
+		j++
 	}
 	return ok
 }

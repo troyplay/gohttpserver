@@ -53,7 +53,7 @@
             <div class="input-group">
               <input type="text" name="search" class="form-control" placeholder="Search text" v-bind:value="search" autofocus>
               <span class="input-group-btn">
-                <button class="btn btn-default" type="button">   
+                <button class="btn btn-default" type="button">
                 <span class="glyphicon glyphicon-search"></span>
               </button>
               </span>
@@ -93,6 +93,9 @@
               </button>
               <button class="btn btn-xs btn-default" v-if="auth.upload" data-toggle="modal" data-target="#upload-modal">
                 Upload <i class="fa fa-upload"></i>
+              </button>
+              <button class="btn btn-xs btn-default" v-if="auth.mkdir" data-toggle="modal" data-target="#mkdir-modal">
+                Mkdir <i class="fa fa-folder"></i>
               </button>
             </td>
           </tr>
@@ -193,6 +196,26 @@
               <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
               <h4 class="modal-title">
                 <i class="fa fa-upload"></i> File upload
+              </h4>
+            </div>
+            <div class="modal-body">
+              <form action="#" class="dropzone" id="upload-form"></form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-default" @click="removeAllUploads">RemoveAll</button>
+              <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Mkdir modal-->
+      <div id="mkdir-modal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+              <h4 class="modal-title">
+                <i class="fa fa-folder"></i> Folder Create
               </h4>
             </div>
             <div class="modal-body">

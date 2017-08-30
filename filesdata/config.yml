@@ -1,0 +1,8 @@
+---
+addr: ":4000"
+title: "Model管理"
+theme: black
+debug: true
+xheaders: true
+cors: true
+root: filesdata
