@@ -301,6 +301,9 @@ var vm = new Vue({
     deletePathConfirm: function(f, e) {
       // confirm
       e.preventDefault();
+      if(!confirm("确认删除？")){
+        return;
+      }
       $.ajax({
         url: pathJoin([location.pathname, f.name]),
         method: 'DELETE',

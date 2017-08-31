@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>gohttp server</title>
+  <title>[[.Title]]</title>
   <link rel="shortcut icon" type="image/png" href="/-/res/favicon.png" />
   <link rel="stylesheet" type="text/css" href="/-/res/bootstrap-3.3.5/css/bootstrap.min.css">
   <link rel="stylesheet" type="text/css" href="/-/res/font-awesome-4.6.3/css/font-awesome.min.css">
@@ -121,6 +121,9 @@
                   <span class="hidden-xs">Archive</span> Zip
                   <span class="glyphicon glyphicon-download-alt"></span>
                 </a>
+                <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
+                  <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
+                </button>
               </template>
               <template v-if="f.type == 'file'">
                 <a class="btn btn-default btn-xs hidden-xs" href="/{{f.path}}?download=true">

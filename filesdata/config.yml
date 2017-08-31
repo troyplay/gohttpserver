@@ -5,4 +5,4 @@ theme: black
 debug: true
 xheaders: true
 cors: true
-root: filesdata
+root: filesdata/

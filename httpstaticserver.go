@@ -85,6 +85,8 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	m.HandleFunc("/-/json/{path:.*}", s.hJSONList)
 	// routers for directory
 	m.HandleFunc("/-/mkdir/{path:.*}", s.hMkdir).Methods("POST")
+	// routers for checkout directory
+
 	// routers for Apple *.ipa
 	m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
 	m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
@@ -195,7 +197,6 @@ func (s *HTTPStaticServer) hEdit(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
-	// only can delete file now
 	path := mux.Vars(req)["path"]
 	auth := s.readAccessConf(path)
 	log.Printf("%#v", auth)
@@ -203,11 +204,23 @@ func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Delete forbidden", http.StatusForbidden)
 		return
 	}
-	err := os.Remove(filepath.Join(s.Root, path))
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
+	localPath := filepath.Join(s.Root, path)
+	// delete single file
+	if isFile(localPath) {
+		err := os.Remove(localPath)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	} else if isDir(localPath) {
+		// delete directory
+		err := os.RemoveAll(localPath)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 	}
+
 	w.Write([]byte("Success"))
 }
 
