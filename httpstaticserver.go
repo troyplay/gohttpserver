@@ -83,6 +83,8 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	m.HandleFunc("/-/zip/{path:.*}", s.hZip)
 	m.HandleFunc("/-/unzip/{zip_path:.*}/-/{path:.*}", s.hUnzip)
 	m.HandleFunc("/-/json/{path:.*}", s.hJSONList)
+	// routers for directory
+	m.HandleFunc("/-/mkdir/{path:.*}", s.hMkdir).Methods("POST")
 	// routers for Apple *.ipa
 	m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
 	m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
@@ -92,9 +94,8 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	// routers for listing (directory or files) / uploading / deleting files
 	m.HandleFunc("/{path:.*}", s.hIndex).Methods("GET", "HEAD")
 	m.HandleFunc("/{path:.*}", s.hUpload).Methods("POST")
+	m.HandleFunc("/{path:.*}", s.hEdit).Methods("PUT")
 	m.HandleFunc("/{path:.*}", s.hDelete).Methods("DELETE")
-	// routers for directory
-	m.HandleFunc("/-/mkdir/{path:.*}", s.hMkdir).Methods("POST")
 
 	return s
 }
@@ -128,7 +129,6 @@ func (s *HTTPStaticServer) hStatus(w http.ResponseWriter, r *http.Request) {
 
 // create function to HTTPStaticServer for making directory
 func (s *HTTPStaticServer) hMkdir(w http.ResponseWriter, req *http.Request) {
-	// only can delete file now
 	path := mux.Vars(req)["path"]
 	auth := s.readAccessConf(path)
 	log.Printf("%#v", auth)
@@ -136,19 +136,61 @@ func (s *HTTPStaticServer) hMkdir(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Mkdir forbidden", http.StatusForbidden)
 		return
 	}
-	folder := filepath.Join(s.Root, path)
+	// get folder name from request Body
+	folderName := req.FormValue("folderName")
+	folder := filepath.Join(s.Root, path, folderName)
 	err := os.Mkdir(folder, 0731) // wxr-xr-x
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		// if folder already exists
+		if os.IsExist(err) {
+			http.Error(w, "Mkdir forbidden: directory already exists", http.StatusForbidden)
+		} else {
+			http.Error(w, err.Error(), 500)
+		}
 		return
 	}
-	//TODO create default auth file
+	// create default auth file
 	cfgFile := filepath.Join(folder, ".ghs.yml")
 	file, createErr := os.Create(cfgFile)
 	if createErr != nil {
 		log.Printf("%#v", createErr)
 	}
 	file.WriteString("upload: true\ndelete: true\nmkdir: false")
+	defer file.Close()
+
+	w.Write([]byte("Success"))
+}
+
+// create function to HTTPStaticServer for editing file
+func (s *HTTPStaticServer) hEdit(w http.ResponseWriter, req *http.Request) {
+	// only can delete file now
+	path := mux.Vars(req)["path"]
+	auth := s.readAccessConf(path)
+	log.Printf("%#v", auth)
+	if !auth.canUpload(req) {
+		// user can edit file only if has upload authority
+		http.Error(w, "Edit forbidden", http.StatusForbidden)
+		return
+	}
+	// get file content from request Body
+	fileContent := req.FormValue("content")
+	localPath := filepath.Join(s.Root, path)
+	// if path is directory, can't edit
+	if isDir(localPath) {
+		http.Error(w, "Edit forbidden: directory can't be modified: "+localPath, http.StatusForbidden)
+		return
+	}
+	// open file and over write
+	err := ioutil.WriteFile(localPath, []byte(fileContent), 0666)
+	if err != nil {
+		// if open file fails
+		if !os.IsExist(err) {
+			http.Error(w, "Edit forbidden: file not exists", http.StatusForbidden)
+		} else {
+			http.Error(w, err.Error(), 500)
+		}
+		return
+	}
 	w.Write([]byte("Success"))
 }
 

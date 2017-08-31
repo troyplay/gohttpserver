@@ -138,6 +138,71 @@ var vm = new Vue({
     removeAllUploads: function() {
       this.myDropzone.removeAllFiles();
     },
+    clickMkdir: function(){
+      var folderName = $("#mkdir-input").val();
+      if (folderName != "") {
+        $.ajax({
+          url: pathJoin(["/-/mkdir", location.pathname]),
+          dataType:"text",
+          method: "POST",
+          data:{"folderName" : folderName},
+          success: function(res) {
+            console.log("mkdir successfully");
+            // clear input
+            $("#mkdir-input").val('');
+            $('#mkdir-modal').modal("hide");
+            // reload files
+            loadFileList();
+          },
+          error:function(res){
+            console.error(res);
+            $('#mkdir-error-alert span').text(res.responseText);
+            $('#mkdir-error-alert').fadeIn('slow').delay(3000).fadeOut('slow');
+          }
+        })
+      }else{
+        $('#mkdir-error-alert span').text('Folder Name can\'t be empty！');
+        $('#mkdir-error-alert').fadeIn('slow').delay(3000).fadeOut('slow');
+      }
+    },
+    // load file content and edit file
+    showEditFile: function(f) {
+      $.ajax({
+        url: pathJoin([location.pathname, f.name]),
+        method: "GET",
+        success: function(res) {
+          $("#file-edit-title").text(f.name);
+          $("#file-edit-text-area").val(res);
+          $("#file-edit-modal").modal("show");
+        },
+        error:function(res){
+          console.error(res);
+          $('#edit-error-alert span').text(res.responseText);
+          $('#edit-error-alert').fadeIn('slow').delay(3000).fadeOut('slow');
+        }
+      })
+    },
+    // save edit file content
+    saveEditFile: function() {
+      var fileContent = $("#file-edit-text-area").val();
+      var fileName = $("#file-edit-title").text();
+      $.ajax({
+          url: pathJoin([location.pathname, fileName]),
+          dataType: "text",
+          method: "PUT",
+          data:{"content" : fileContent},
+          success: function(res) {
+            $("#file-edit-modal").modal("hide");
+            // reload files
+            loadFileList();
+          },
+          error:function(res){
+            console.error(res);
+            $('#edit-error-alert span').text(res.responseText);
+            $('#edit-error-alert').fadeIn('slow').delay(3000).fadeOut('slow');
+          }
+        })
+    },
     genInstallURL: function(name) {
       var urlPath;
       if (getExtention(name) == "ipa") {
@@ -162,6 +227,10 @@ var vm = new Vue({
     },
     shouldHaveQrcode: function(name) {
       return ['apk', 'ipa'].indexOf(getExtention(name)) !== -1;
+    },
+    // whether file is editable
+    isFileEditable: function(name) {
+      return name.endsWith('.yml');
     },
     genFileClass: function(f) {
       if (f.type == "dir") {
