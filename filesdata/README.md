@@ -54,8 +54,8 @@ accessTables:
 | **checked**  | string  |    如果当前目录作为channel，checked指定当前channel活跃的文件|
 | **users**  | table  |   针对每一个用户进行对应的权限配置|
 | **accessTables**  | table  |   针对每一个文件配置是否可见|
- 
- - users 表:
+
+`users 表`
 
 | 字段      | 类型           | 说明  |
 | ------------- |:-------------:| :-----:|
@@ -64,15 +64,15 @@ accessTables:
 | **delete**     | bool   |   是否可以在当前目录中删除文件或者子目录|
 | **mkdir**  | bool  |    是否可以在当前目录中创建子目录|
 
- - accessTables 表:
+`accessTables 表`
 
 | 字段      | 类型           | 说明  |
 | ------------- |:-------------:| :-----:|
-| ** regex**  | string | 文件匹配正则表达式 |
+| **regex**  | string | 文件匹配正则表达式 |
 | **upload**  | bool | 是否可以在当前目录中上传文件 |
 | **allow**     | bool   |   文件是否可见|
 
-## channel与checkout 
+## channel与checkout
 通过设置目录的checked配置项，可以改变channel的checkout资源地址。默认返回目录中最新上传或修改的文件。
 ```
 GET <IP>:<PORT>/-/checkout/<directory>
