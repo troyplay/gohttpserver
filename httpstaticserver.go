@@ -86,7 +86,7 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	// routers for directory
 	m.HandleFunc("/-/mkdir/{path:.*}", s.hMkdir).Methods("POST")
 	// routers for checkout directory
-
+	m.HandleFunc("/-/checkout/{path:.*}", s.hCheckoutDir).Methods("GET", "HEAD")
 	// routers for Apple *.ipa
 	m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
 	m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
@@ -153,14 +153,72 @@ func (s *HTTPStaticServer) hMkdir(w http.ResponseWriter, req *http.Request) {
 	}
 	// create default auth file
 	cfgFile := filepath.Join(folder, ".ghs.yml")
-	file, createErr := os.Create(cfgFile)
-	if createErr != nil {
-		log.Printf("%#v", createErr)
-	}
+	file, _ := os.Create(cfgFile)
 	file.WriteString("upload: true\ndelete: true\nmkdir: false")
 	defer file.Close()
 
 	w.Write([]byte("Success"))
+}
+
+// unchecked files in folder regex
+var uncheckedFileRegx, _ = regexp.Compile(".*\\.(yml|md)$")
+
+// create function to HTTPStaticServer for checking out directory
+// checout directory will return the latest modified file or file with obvious tag "checked" in ".ghs.yml"
+func (s *HTTPStaticServer) hCheckoutDir(w http.ResponseWriter, req *http.Request) {
+	path := mux.Vars(req)["path"]
+	relPath := filepath.Join(s.Root, path)
+	testAuthPath := filepath.Join(path, ".ghs.yml") // TMP path to test loading auth config file
+	auth := s.readAccessConf(testAuthPath)
+	log.Printf("%#v", auth)
+	if !auth.canAccess(path) {
+		http.Error(w, "Checkout forbidden", http.StatusForbidden)
+		return
+	}
+	// if path is not directory
+	if !isDir(relPath) {
+		http.Error(w, "Checkout forbidden: directory not exists "+path, http.StatusForbidden)
+		return
+	}
+	// get checkout tag in auth
+	checkedFileName := auth.Checked
+	if checkedFileName != "" {
+		checkedFilePath := filepath.Join(relPath, checkedFileName)
+		if isFile(checkedFilePath) {
+			// set header
+			w.Header().Set("Content-Disposition", "attachment; filename="+checkedFileName)
+			http.ServeFile(w, req, checkedFilePath)
+		} else {
+			http.Error(w, "Checkout forbidden: not valid file "+checkedFilePath, http.StatusForbidden)
+		}
+	} else {
+		// load all files in directory and get latest modified
+		fileInfos, err := ioutil.ReadDir(relPath)
+		// if can't list file or no file except the ".yml" or ".md" file
+		if err != nil || len(fileInfos) == 0 {
+			http.Error(w, "Checkout forbidden: no content in "+path, http.StatusForbidden)
+		} else {
+			var latestFileInfo os.FileInfo
+			for _, fileInfo := range fileInfos {
+				// ignore directory and ".yml" or ".md" file
+				if fileInfo.IsDir() || uncheckedFileRegx.MatchString(fileInfo.Name()) {
+					continue
+				}
+				if latestFileInfo == nil {
+					latestFileInfo = fileInfo
+				} else if fileInfo.ModTime().After(latestFileInfo.ModTime()) {
+					latestFileInfo = fileInfo
+				}
+			}
+			if latestFileInfo != nil {
+				// set header
+				w.Header().Set("Content-Disposition", "attachment; filename="+latestFileInfo.Name())
+				http.ServeFile(w, req, filepath.Join(relPath, latestFileInfo.Name()))
+			} else {
+				http.Error(w, "Checkout forbidden: no content in "+path, http.StatusForbidden)
+			}
+		}
+	}
 }
 
 // create function to HTTPStaticServer for editing file
@@ -171,7 +229,7 @@ func (s *HTTPStaticServer) hEdit(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%#v", auth)
 	if !auth.canUpload(req) {
 		// user can edit file only if has upload authority
-		http.Error(w, "Edit forbidden", http.StatusForbidden)
+		http.Error(w, "Edit forbidden: not authorized", http.StatusForbidden)
 		return
 	}
 	// get file content from request Body
@@ -471,6 +529,7 @@ type AccessConf struct {
 	Upload       bool          `yaml:"upload" json:"upload"`
 	Delete       bool          `yaml:"delete" json:"delete"`
 	MKDir        bool          `yaml:"mkdir" json:"mkdir"`
+	Checked      string        `yaml:"checked" json:"checked"`
 	Users        []UserControl `yaml:"users" json:"users"`
 	AccessTables []AccessTable `yaml:"accessTables"`
 }

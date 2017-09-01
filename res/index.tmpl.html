@@ -121,6 +121,10 @@
                   <span class="hidden-xs">Archive</span> Zip
                   <span class="glyphicon glyphicon-download-alt"></span>
                 </a>
+                <a class="btn btn-default btn-xs" href="/-/checkout/{{f.path}}" v-if="auth.delete">
+                  <span class="hidden-xs">Checkout</span>
+                  <span class="fa fa-cart-arrow-down"></span>
+                </a>
                 <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
                   <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
                 </button>
